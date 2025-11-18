@@ -1,12 +1,27 @@
-﻿import streamlit as st
+﻿# accueil.py
+# Page d'accueil EverINSIGHT — Diagnostic DISC
+
+import streamlit as st
 from datetime import datetime
 
-st.set_page_config(page_title="Accueil — EverINSIGHT DISC", page_icon="🧠")
+# ---------------------------------------------------------
+# Config générale de la page
+# ---------------------------------------------------------
+st.set_page_config(
+    page_title="EverINSIGHT — Diagnostic DISC",
+    page_icon="🧠",
+    layout="wide",
+)
 
-st.title("EverINSIGHT — Diagnostic DISC")
+# ---------------------------------------------------------
+# Page principale (aucun mot de passe)
+# ---------------------------------------------------------
+def main():
 
-st.markdown(
-    """
+    st.title("EverINSIGHT — Diagnostic DISC")
+
+    st.markdown(
+        """
 Le modèle **DISC** décrit 4 grandes manières d’agir et de communiquer :
 
 - **D – Dominance** : orienté résultats, aime décider et relever des défis.  
@@ -15,76 +30,83 @@ Le modèle **DISC** décrit 4 grandes manières d’agir et de communiquer :
 - **C – Conformité** : structuré, rigoureux, orienté qualité et précision.
 
 Ce questionnaire n’est **ni un test d’intelligence, ni un jugement**.  
-Il sert à mieux comprendre votre **style naturel**, vos **points forts** et vos **axes de progression** pour travailler plus efficacement en équipe.
+Il sert à mieux comprendre votre **style naturel**, vos **points forts**
+et vos **axes de progression** pour travailler plus efficacement en équipe.
 """
-)
-
-st.markdown("---")
-
-# ---------- Initialisation session_state ----------
-for key in ["user_email", "user_firstname", "user_lastname", "disc_date"]:
-    st.session_state.setdefault(key, "")
-
-st.subheader("1. Vos informations")
-
-with st.form("identite_disc"):
-    col1, col2 = st.columns(2)
-    with col1:
-        firstname = st.text_input("Prénom", value=st.session_state.get("user_firstname", ""))
-    with col2:
-        lastname = st.text_input("Nom", value=st.session_state.get("user_lastname", ""))
-
-    email = st.text_input(
-        "Adresse e-mail (celle utilisée pour le cours)",
-        value=st.session_state.get("user_email", ""),
-        help="Elle sera utilisée pour associer votre profil DISC à vos résultats."
     )
 
-    submitted = st.form_submit_button("Enregistrer mes informations")
+    st.markdown("---")
 
-if submitted:
-    if not email.strip():
-        st.error("Merci d’indiquer au minimum votre **adresse e-mail**.")
-    else:
-        st.session_state["user_firstname"] = firstname.strip()
-        st.session_state["user_lastname"] = lastname.strip()
-        st.session_state["user_email"] = email.strip().lower()
-        # On ne met la date que si elle n’existe pas encore (1ère passation)
-        if not st.session_state.get("disc_date"):
-            st.session_state["disc_date"] = datetime.today().date().isoformat()
+    # -----------------------------------------------------
+    # 1. Vos informations
+    # -----------------------------------------------------
+    st.header("1. Vos informations")
 
-        st.success(
-            "Vos informations ont été enregistrées. "
-            "Vous pouvez maintenant passer au **Questionnaire DISC** via le menu à gauche."
+    default_first_name = st.session_state.get("first_name", "")
+    default_last_name = st.session_state.get("last_name", "")
+    default_email = st.session_state.get("email", "")
+
+    with st.form("user_info_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            first_name = st.text_input("Prénom", value=default_first_name)
+        with col2:
+            last_name = st.text_input("Nom", value=default_last_name)
+
+        email = st.text_input(
+            "Adresse e-mail (celle utilisée pour le cours)",
+            value=default_email,
+            help="Elle servira à retrouver vos résultats et recevoir votre synthèse.",
         )
 
-if st.session_state.get("user_email"):
-    st.markdown("### 2. Récapitulatif de vos informations")
+        submitted = st.form_submit_button("Enregistrer mes informations")
 
-    nom_aff = (
-        f"{st.session_state.get('user_firstname', '')} {st.session_state.get('user_lastname', '')}"
-        ).strip()
+    if submitted:
+        if not first_name or not last_name or not email:
+            st.error("Merci de renseigner **Prénom**, **Nom** et **Adresse e-mail**.")
+        elif "@" not in email:
+            st.error("L’adresse e-mail ne semble pas valide.")
+        else:
+            st.session_state["first_name"] = first_name.strip()
+            st.session_state["last_name"] = last_name.strip()
+            st.session_state["email"] = email.strip().lower()
+            st.session_state["user_saved_at"] = datetime.utcnow().isoformat() + "Z"
 
-    st.write(f"- **Nom / Prénom :** {nom_aff or '—'}")
-    st.write(f"- **E-mail :** {st.session_state['user_email']}")
+            st.success(
+                f"Merci {first_name}, vos informations ont été enregistrées. "
+                "Vous pouvez maintenant passer à l’onglet **Questionnaire DISC**."
+            )
 
-    if st.session_state.get("disc_date"):
-        try:
-            d = datetime.fromisoformat(st.session_state["disc_date"])
-            st.write(f"- **Date d’enregistrement :** {d.strftime('%d/%m/%Y')}")
-        except Exception:
-            st.write(f"- **Date d’enregistrement :** {st.session_state['disc_date']}")
+    if st.session_state.get("email"):
+        st.info(
+            f"Vous êtes connecté en tant que **{st.session_state.get('first_name', '')} "
+            f"{st.session_state.get('last_name', '')}** "
+            f"({st.session_state['email']}).\n\n"
+            "Si besoin, vous pouvez modifier ces informations puis cliquer sur "
+            "**Enregistrer mes informations**."
+        )
 
-st.markdown("---")
-st.subheader("3. Comment va se dérouler l’exercice ?")
+    st.markdown("---")
 
-st.markdown(
-    """
-1. Sur cette page **Accueil**, vous enregistrez vos informations.  
-2. Dans l’onglet **Questionnaire DISC**, vous répondez aux 25 situations (choix forcé).  
-3. Dans l’onglet **Mes résultats & plan d’action**, vous retrouvez votre profil, vos points forts et vos axes de réflexion.
+    # -----------------------------------------------------
+    # 2. Étapes suivantes
+    # -----------------------------------------------------
+    st.header("2. Comment se déroule la démarche ?")
 
-Vous pourrez revenir sur vos résultats à tout moment pendant la séance avec le **même e-mail**.
+    st.markdown(
+        """
+1. Renseignez vos informations sur cette page.  
+2. Allez dans l’onglet **“Questionnaire DISC”** pour répondre aux 25 situations proposées.  
+3. Une fois le questionnaire complété, vous pourrez accéder à **“Mes Résultats et Plan d’action”** pour :
+   - visualiser votre profil DISC et votre radar,  
+   - lire une analyse synthétique de vos points forts,  
+   - identifier des axes de réflexion,  
+   - définir un **micro plan d’action personnel**.
+
+Vous pourrez également télécharger votre synthèse au format **PDF**.
 """
-)
+    )
+
+if __name__ == "__main__":
+    main()
 
