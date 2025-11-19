@@ -67,10 +67,16 @@ et vos **axes de progression** pour travailler plus efficacement en équipe.
         elif "@" not in email:
             st.error("L’adresse e-mail ne semble pas valide.")
         else:
+           else:
             st.session_state["first_name"] = first_name.strip()
             st.session_state["last_name"] = last_name.strip()
             st.session_state["email"] = email.strip().lower()
             st.session_state["user_saved_at"] = datetime.utcnow().isoformat() + "Z"
+
+            # ⚙️ compatibilité avec les autres pages
+            st.session_state["prenom"] = st.session_state["first_name"]
+            st.session_state["nom"] = st.session_state["last_name"]
+
 
             st.success(
                 f"Merci {first_name}, vos informations ont été enregistrées. "

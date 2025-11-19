@@ -224,7 +224,8 @@ ax.plot([math.radians(315), math.radians(315)], [0, rC], color=radar_color, line
 if prenom:
     name_display = prenom
 else:
-    name_display = email or "participant"
+    display_name = session_first_name or email or "participant"
+
 
 ax.scatter(
     math.radians(marker_angle_deg),
@@ -238,13 +239,14 @@ label_r = max(0.05, marker_r - 0.08)
 ax.text(
     math.radians(marker_angle_deg),
     label_r,
-    name_display,
+    display_name,
     ha="center",
     va="top",
     fontsize=11,
     color="#333",
     zorder=7,
 )
+
 
 ax.text(math.radians(45), 1.03, "D", color=COLOR["D"], ha="center", va="center",
         fontsize=14, fontweight="bold")
