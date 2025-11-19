@@ -3,3 +3,5 @@ pandas
 matplotlib
 altair
 fpdf
+gspread
+google-auth
