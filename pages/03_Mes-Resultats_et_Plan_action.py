@@ -78,11 +78,16 @@ if not records:
     )
     st.stop()
 
+# Derniere passation
 last_rec = records[-1]
 
 scores = last_rec.get("scores", {})
 style_code = last_rec.get("style", "")
 top_dims = last_rec.get("top_dims", [])
+
+# 👉 Recuperation du prenom / nom s'ils existent dans le JSON
+prenom = (last_rec.get("prenom") or "").strip()
+nom = (last_rec.get("nom") or "").strip()
 
 for k in ["D", "I", "S", "C"]:
     scores.setdefault(k, 0)
@@ -216,7 +221,12 @@ ax.plot([math.radians(135), math.radians(135)], [0, rI], color=radar_color, line
 ax.plot([math.radians(225), math.radians(225)], [0, rS], color=radar_color, linewidth=1.0)
 ax.plot([math.radians(315), math.radians(315)], [0, rC], color=radar_color, linewidth=1.0)
 
-name_display = email or "participant"
+# 👉 Affichage du prenom si disponible, sinon email, sinon "participant"
+if prenom:
+    name_display = prenom
+else:
+    name_display = email or "participant"
+
 ax.scatter(
     math.radians(marker_angle_deg),
     marker_r,
@@ -308,19 +318,45 @@ for dim in [ordered[0][0], ordered[1][0]]:
 
 st.subheader("Vos points forts naturels")
 
+# Ici on reste focus sur les 2 energies principales dans la synthese coachée
 for dim in [ordered[0][0], ordered[1][0]]:
     st.markdown(f"- **{DIM_LABELS[dim][0]} ({dim})** : {DIM_NATURAL_STRENGTHS[dim]}")
 
-st.subheader("Axes de reflexion pour progresser")
+st.subheader("Axes de réflexion pour progresser")
 
-st.markdown("**1. Utiliser vos forces sans tomber dans leurs exces**")
-for dim in [ordered[0][0], ordered[1][0]]:
-    st.markdown(f"- **Energie {DIM_LABELS[dim][0]} ({dim})** : {DIM_EXCESS[dim]}")
+# On sépare clairement forces et énergies moins naturelles
+strong_dims = [d for d, s in scores.items() if s >= 6]   # ≥ 6
+weak_dims   = [d for d, s in scores.items() if s < 6]    # < 6
 
-st.markdown("**2. Developper davantage vos energies moins naturelles**")
-for dim in ["D", "I", "S", "C"]:
-    if dim not in [ordered[0][0], ordered[1][0]]:
-        st.markdown(f"- **{DIM_LABELS[dim][0]} ({dim})** : {DIM_DEV[dim]}")
+# Textes risques d’excès pour les énergies fortes
+RISK_TEXT = {
+    "D": "En excès, vous pouvez aller trop vite, imposer vos vues ou prendre peu de temps pour écouter.",
+    "I": "En excès, vous pouvez beaucoup parler, vous disperser ou perdre de vue l’objectif.",
+    "S": "En excès, vous pouvez éviter les conflits, trop vous adapter et avoir du mal à dire non.",
+    "C": "En excès, vous pouvez être trop dans le détail, ralentir la décision ou manquer de flexibilité."
+}
+
+# Textes de développement pour les énergies moins naturelles
+GROWTH_TEXT = {
+    "D": "Développer davantage la Dominance (D) vous aiderait à prendre plus facilement des décisions, tenir vos positions et oser vous affirmer dans les moments clés.",
+    "I": "Développer davantage l’Influence (I) vous aiderait à partager vos idées, créer plus de lien et embarquer plus facilement les autres.",
+    "S": "Développer davantage la Stabilité (S) vous aiderait à mieux réfléchir aux conséquences de vos actions, prendre en compte l’ensemble des acteurs et installer un climat de confiance.",
+    "C": "Développer davantage la Conformité (C) vous aiderait à structurer vos démarches, sécuriser les points de détail importants et fiabiliser vos décisions."
+}
+
+# 1. Utiliser vos forces sans tomber dans leurs excès
+st.markdown("**1. Utiliser vos forces sans tomber dans leurs excès**")
+for d in strong_dims:
+    label = DIM_LABELS[d][0]  # ex. "Dominance"
+    st.markdown(f"- **Énergie {label} ({d})** : {RISK_TEXT[d]}")
+
+# 2. Développer davantage vos énergies moins naturelles
+st.markdown("**2. Développer davantage vos énergies moins naturelles**")
+if weak_dims:
+    for d in weak_dims:
+        st.markdown(f"- {GROWTH_TEXT[d]}")
+else:
+    st.markdown("Vous mobilisez déjà les 4 énergies de façon assez équilibrée. L’enjeu principal est surtout de doser vos forces en fonction des situations.")
 
 # -------------------------------------------------------------------
 # 5. Plan d'action – micro-comportements
