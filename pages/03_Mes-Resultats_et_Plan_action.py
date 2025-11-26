@@ -1,12 +1,14 @@
 # pages/03_Mes-Resultats_et_Plan_action.py
 # Synthese DISC + plan d'action EverINSIGHT
-
 import os
 import json
 from datetime import datetime
 import io
 import math
 import tempfile
+import smtplib
+import ssl
+from email.message import EmailMessage
 
 import streamlit as st
 import pandas as pd
@@ -461,7 +463,7 @@ with col2:
     )
 
 # -------------------------------------------------------------------
-# 7. Export PDF de synthese (avec radar)
+# 7. Export PDF de synthese (avec radar) + envoi par e-mail
 # -------------------------------------------------------------------
 
 st.markdown("---")
@@ -564,7 +566,50 @@ def build_pdf(
     return pdf_bytes
 
 
-if st.button("Generer le PDF de ma synthese"):
+def send_pdf_by_email(recipient_email: str, pdf_bytes: bytes) -> None:
+    """Envoie le PDF au participant via SMTP (config dans st.secrets)."""
+    try:
+        smtp_server = st.secrets["SMTP_SERVER"]
+        smtp_port = int(st.secrets.get("SMTP_PORT", 587))
+        smtp_user = st.secrets["SMTP_USER"]
+        smtp_password = st.secrets["SMTP_PASSWORD"]
+        smtp_from = st.secrets.get("SMTP_FROM", smtp_user)
+    except Exception as e:
+        st.error("Configuration SMTP manquante dans st.secrets.")
+        st.stop()
+
+    msg = EmailMessage()
+    msg["Subject"] = "Vos resultats EVERINSIGHT (DISC) - PDF de synthese"
+    msg["From"] = smtp_from
+    msg["To"] = recipient_email
+
+    msg.set_content(
+        "Bonjour,\n\n"
+        "Vous trouverez en piece jointe votre synthese DISC au format PDF.\n\n"
+        "A tres bientot,\n"
+        "L'equipe EVERINSIGHT"
+    )
+
+    msg.add_attachment(
+        pdf_bytes,
+        maintype="application",
+        subtype="pdf",
+        filename="profil_disc_synthese.pdf",
+    )
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls(context=context)
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+
+
+st.markdown(
+    "En cliquant sur le bouton ci-dessous, vous genererez un PDF que vous pourrez "
+    "telecharger et qui vous sera egalement envoye par e-mail."
+)
+
+if st.button("Generer mon PDF et me l'envoyer par e-mail"):
     radar_png = st.session_state.get("radar_png")
     pdf_bytes = build_pdf(
         email=email,
@@ -574,10 +619,54 @@ if st.button("Generer le PDF de ma synthese"):
         situation_difficult=situation_difficult,
         radar_png=radar_png,
     )
+    # on garde le PDF en memoire pour le bouton de download
+    st.session_state["last_pdf_bytes"] = pdf_bytes
+
+    try:
+        send_pdf_by_email(email, pdf_bytes)
+        st.success("PDF genere et envoye par e-mail.")
+    except Exception as e:
+        st.error("Le PDF a ete genere mais l'envoi e-mail a echoue. Verifiez la config SMTP.")
+        st.exception(e)
+
+# Bouton de telechargement si un PDF vient d'etre genere
+if "last_pdf_bytes" in st.session_state:
     st.download_button(
         "⬇️ Telecharger le PDF",
-        data=io.BytesIO(pdf_bytes),
+        data=io.BytesIO(st.session_state["last_pdf_bytes"]),
         file_name="profil_disc_synthese.pdf",
         mime="application/pdf",
     )
+import smtplib
+from email.message import EmailMessage
+
+def send_pdf_by_email(receiver_email, pdf_bytes):
+    """Envoie le PDF par email via SMTP."""
+    sender_email = st.secrets["smtp"]["email"]
+    sender_password = st.secrets["smtp"]["password"]
+
+    msg = EmailMessage()
+    msg["Subject"] = "Vos résultats EVERINSIGHT (DISC)"
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    msg.set_content(
+        "Bonjour,\n\n"
+        "Voici votre synthèse DISC au format PDF.\n\n"
+        "Bien à vous,\n"
+        "L'équipe EVERINSIGHT"
+    )
+
+    # Pièce jointe
+    msg.add_attachment(
+        pdf_bytes,
+        maintype="application",
+        subtype="pdf",
+        filename="profil_disc_synthese.pdf"
+    )
+
+    # Envoi via SMTP sécurisé
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(sender_email, sender_password)
+        smtp.send_message(msg)
+
 
