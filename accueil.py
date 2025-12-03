@@ -1,6 +1,9 @@
 ﻿import streamlit as st
 from datetime import datetime
 
+# -------------------------------
+#  CONFIG DE LA PAGE
+# -------------------------------
 st.set_page_config(page_title="Accueil", page_icon="🏠", layout="wide")
 
 st.title("EverINSIGHT — Diagnostic DISC")
@@ -30,7 +33,7 @@ with st.form("user_form"):
     email = st.text_input(
         "Adresse e-mail (celle utilisée pour le cours)",
         value=st.session_state["email"],
-        help="Elle servira à retrouver vos résultats et votre synthèse."
+        help="Elle servira à retrouver vos résultats et votre synthèse.",
     )
 
     submitted = st.form_submit_button("Enregistrer mes informations")
@@ -64,4 +67,3 @@ if st.session_state.get("email"):
         "Vous pouvez modifier vos informations si besoin, puis cliquer sur "
         "**Enregistrer mes informations**."
     )
-

@@ -1,5 +1,6 @@
 # pages/03_Mes-Resultats_et_Plan_action.py
 # Synthese DISC + plan d'action EverINSIGHT
+
 import os
 import json
 from datetime import datetime
@@ -15,6 +16,12 @@ import pandas as pd
 import altair as alt
 import matplotlib.pyplot as plt
 from fpdf import FPDF
+
+st.set_page_config(
+    page_title="Mes resultats & plan d'action",
+    page_icon="📊",
+    layout="wide",
+)
 
 st.title("Mes resultats & plan d'action")
 
@@ -97,47 +104,54 @@ if not email:
     st.stop()
 
 # -------------------------------------------------------------------
-# 2. Chargement du dernier resultat correspondant a cet e-mail
+# 2. Chargement du resultat DISC
+#    1) Priorite a st.session_state["disc_results"] (si vient de 02)
+#    2) Sinon : lecture du dernier enregistrement dans le log JSONL
 # -------------------------------------------------------------------
 
-PAGES_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(PAGES_DIR)
-LOG_DIR = os.path.join(PROJECT_ROOT, "Data", "logs")
-LOG_PATH = os.path.join(LOG_DIR, "disc_forced_sessions.jsonl")
+disc_results = st.session_state.get("disc_results")
 
-if not os.path.exists(LOG_PATH):
-    st.error("Aucun resultat trouve pour l’instant. Le fichier de reponses n’existe pas encore.")
-    st.stop()
+if disc_results and (disc_results.get("user", "").strip().lower() == email):
+    last_rec = disc_results
+else:
+    # Fallback : lecture du fichier JSONL
+    PAGES_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_ROOT = os.path.dirname(PAGES_DIR)
+    LOG_DIR = os.path.join(PROJECT_ROOT, "Data", "logs")
+    LOG_PATH = os.path.join(LOG_DIR, "disc_forced_sessions.jsonl")
 
-records = []
-with open(LOG_PATH, "r", encoding="utf-8") as f:
-    for line in f:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        user_field = (rec.get("user") or "").strip().lower()
-        if user_field == email:
-            records.append(rec)
+    if not os.path.exists(LOG_PATH):
+        st.error("Aucun resultat trouve pour l’instant. Le fichier de reponses n’existe pas encore.")
+        st.stop()
 
-if not records:
-    st.warning(
-        "Aucun resultat DISC trouve pour cet e-mail. "
-        "Vous n’avez peut-etre pas encore valide le questionnaire, "
-        "ou vous avez utilise une autre adresse."
-    )
-    st.stop()
+    records = []
+    with open(LOG_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            user_field = (rec.get("user") or "").strip().lower()
+            if user_field == email:
+                records.append(rec)
 
-last_rec = records[-1]
+    if not records:
+        st.warning(
+            "Aucun resultat DISC trouve pour cet e-mail. "
+            "Vous n’avez peut-etre pas encore valide le questionnaire, "
+            "ou vous avez utilise une autre adresse."
+        )
+        st.stop()
+
+    last_rec = records[-1]
 
 scores = last_rec.get("scores", {}) or {}
 for k in ["D", "I", "S", "C"]:
     scores.setdefault(k, 0)
 
-# Pour certains calculs, on a besoin d'un classement des dimensions
 ordered = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
 
 # -------------------------------------------------------------------
@@ -218,7 +232,6 @@ radar_pts = {
     "C": pol2xy(315, rC),
 }
 
-# Milieu entre les 2 energies les plus fortes
 dims_top2 = [ordered[0][0], ordered[1][0]]
 x1, y1 = radar_pts[dims_top2[0]]
 x2, y2 = radar_pts[dims_top2[1]]
@@ -278,7 +291,7 @@ ax.plot([math.radians(135), math.radians(135)], [0, rI], color=radar_color, line
 ax.plot([math.radians(225), math.radians(225)], [0, rS], color=radar_color, linewidth=1.0)
 ax.plot([math.radians(315), math.radians(315)], [0, rC], color=radar_color, linewidth=1.0)
 
-# 👉 Nom affiche : prenom si dispo (session), sinon email, sinon "participant"
+# Nom affiche : prenom si dispo, sinon email, sinon "participant"
 if session_first_name:
     name_display = session_first_name
 else:
@@ -390,7 +403,6 @@ for dim in [ordered[0][0], ordered[1][0]]:
 
 st.subheader("Axes de reflexion pour progresser")
 
-# ≥ 6 = energies fortes ; < 6 = energies moins naturelles
 strong_dims = [d for d, s in scores.items() if s >= 6]
 weak_dims = [d for d, s in scores.items() if s < 6]
 
@@ -567,15 +579,19 @@ def build_pdf(
 
 
 def send_pdf_by_email(recipient_email: str, pdf_bytes: bytes) -> None:
-    """Envoie le PDF au participant via SMTP (config dans st.secrets)."""
+    """Envoie le PDF au participant via SMTP (config dans [email] de secrets.toml)."""
     try:
-        smtp_server = st.secrets["SMTP_SERVER"]
-        smtp_port = int(st.secrets.get("SMTP_PORT", 587))
-        smtp_user = st.secrets["SMTP_USER"]
-        smtp_password = st.secrets["SMTP_PASSWORD"]
-        smtp_from = st.secrets.get("SMTP_FROM", smtp_user)
-    except Exception as e:
-        st.error("Configuration SMTP manquante dans st.secrets.")
+        email_conf = st.secrets["email"]
+        smtp_server = email_conf["smtp_host"]
+        smtp_port = int(email_conf.get("smtp_port", 587))
+        smtp_user = email_conf["smtp_username"]
+        smtp_password = email_conf["smtp_password"]
+        smtp_from = email_conf.get("from_email", smtp_user)
+    except Exception:
+        st.error(
+            "Configuration SMTP manquante ou incomplete dans st.secrets['email'].\n"
+            "Attendu : smtp_host, smtp_port, smtp_username, smtp_password, from_email."
+        )
         st.stop()
 
     msg = EmailMessage()
@@ -606,7 +622,7 @@ def send_pdf_by_email(recipient_email: str, pdf_bytes: bytes) -> None:
 
 st.markdown(
     "En cliquant sur le bouton ci-dessous, vous genererez un PDF que vous pourrez "
-    "telecharger et qui vous sera egalement envoye par e-mail."
+    "telecharger et qui vous sera egalement envoye par e-mail (si la config SMTP est en place)."
 )
 
 if st.button("Generer mon PDF et me l'envoyer par e-mail"):
@@ -619,7 +635,6 @@ if st.button("Generer mon PDF et me l'envoyer par e-mail"):
         situation_difficult=situation_difficult,
         radar_png=radar_png,
     )
-    # on garde le PDF en memoire pour le bouton de download
     st.session_state["last_pdf_bytes"] = pdf_bytes
 
     try:
@@ -637,36 +652,5 @@ if "last_pdf_bytes" in st.session_state:
         file_name="profil_disc_synthese.pdf",
         mime="application/pdf",
     )
-import smtplib
-from email.message import EmailMessage
-
-def send_pdf_by_email(receiver_email, pdf_bytes):
-    """Envoie le PDF par email via SMTP."""
-    sender_email = st.secrets["smtp"]["email"]
-    sender_password = st.secrets["smtp"]["password"]
-
-    msg = EmailMessage()
-    msg["Subject"] = "Vos résultats EVERINSIGHT (DISC)"
-    msg["From"] = sender_email
-    msg["To"] = receiver_email
-    msg.set_content(
-        "Bonjour,\n\n"
-        "Voici votre synthèse DISC au format PDF.\n\n"
-        "Bien à vous,\n"
-        "L'équipe EVERINSIGHT"
-    )
-
-    # Pièce jointe
-    msg.add_attachment(
-        pdf_bytes,
-        maintype="application",
-        subtype="pdf",
-        filename="profil_disc_synthese.pdf"
-    )
-
-    # Envoi via SMTP sécurisé
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(sender_email, sender_password)
-        smtp.send_message(msg)
 
 
