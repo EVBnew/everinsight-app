@@ -6,12 +6,11 @@ from datetime import datetime
 # -------------------------------
 st.set_page_config(page_title="Accueil", page_icon="🏠", layout="wide")
 
-st.title("EverINSIGHT — Diagnostic DISC")
+st.title("Bienvenue dans EVERBOARDING")
 
 st.markdown(
     """
-Ce questionnaire vous aidera à mieux comprendre votre **style naturel**, vos **points forts**
-et vos **axes de progression** pour mieux collaborer en équipe.
+Commençons par les présentations. 
 """
 )
 
