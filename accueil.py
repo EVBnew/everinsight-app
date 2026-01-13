@@ -2,11 +2,8 @@
 import json
 import streamlit as st
 
-from components.everboarding_gate import (
-    get_token_from_url,
-    validate_token_via_webhook,
-    log_event_via_webhook,
-)
+from components.access_guard import enforce_access
+from components.everboarding_gate import log_event_via_webhook  # si tu veux garder tes logs existants
 
 # =============================
 # STREAMLIT CONFIG (MUST BE FIRST)
@@ -24,6 +21,12 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 DEBUG = bool(st.secrets.get("DEBUG", False))
 
+# =============================
+# ACCESS GATE (MUST RUN BEFORE UI)
+# =============================
+access = enforce_access(portal_url=PORTAL_URL, page_name="accueil")
+approved_email = (access.get("email") or "").strip().lower()
+st.session_state["approved_email"] = approved_email  # utile pour verrouiller l'email dans le form
 
 # =============================
 # HELPERS
@@ -49,79 +52,6 @@ def normalize_email(raw: str) -> str:
     return str(raw).replace("\u00A0", " ").strip().lower()
 
 
-def deny_access(title: str, msg: str) -> None:
-    st.warning("🔒 Accès restreint")
-    st.subheader(title)
-    st.write(msg)
-    st.link_button("👉 Demander un accès", PORTAL_URL)
-    st.stop()
-
-
-def require_token_access() -> None:
-    """
-    HARD RULE:
-    - No token in URL => always deny (even if session_state had access_granted before)
-    - Token must validate to 'approved'
-    """
-    token = get_token_from_url()
-
-    # Session keys
-    if "access_granted" not in st.session_state:
-        st.session_state["access_granted"] = False
-    if "approved_email" not in st.session_state:
-        st.session_state["approved_email"] = ""
-    if "validated_token" not in st.session_state:
-        st.session_state["validated_token"] = ""
-
-    # ✅ HARD LOCK: token is mandatory
-    if not token:
-        # Even if user previously had a granted session, we block without token
-        st.session_state["access_granted"] = False
-        st.session_state["approved_email"] = ""
-        st.session_state["validated_token"] = ""
-        deny_access(
-            title="Accès requis",
-            msg="Pour tester l’application, l’accès se fait via EVERBOARDING (invitation / freemium).",
-        )
-
-    # If token changed or never validated, validate now
-    must_validate = (not st.session_state["access_granted"]) or (st.session_state["validated_token"] != token)
-
-    if must_validate:
-        with st.spinner("Vérification de l’accès..."):
-            ok, resp = validate_token_via_webhook(token)
-
-        if not ok:
-            st.session_state["access_granted"] = False
-            st.session_state["approved_email"] = ""
-            st.session_state["validated_token"] = ""
-            deny_access(
-                title="Lien non valide",
-                msg="Le lien est invalide, expiré, ou non approuvé.",
-            )
-
-        # ✅ Access granted
-        st.session_state["access_granted"] = True
-        st.session_state["validated_token"] = token
-        st.session_state["approved_email"] = (resp.get("email") or "").strip().lower()
-
-        # Log app_open once per session
-        if "logged_app_open" not in st.session_state:
-            log_event_via_webhook(
-                email=st.session_state["approved_email"],
-                event="app_open",
-                page="accueil",
-                payload={"token_present": True},
-            )
-            st.session_state["logged_app_open"] = True
-
-
-# =============================
-# ACCESS GATE (token) - MUST RUN BEFORE UI
-# =============================
-require_token_access()
-
-
 # =============================
 # UI
 # =============================
@@ -132,7 +62,6 @@ profile = load_profile()
 default_prenom = profile.get("prenom", "")
 default_nom = profile.get("nom", "")
 
-approved_email = (st.session_state.get("approved_email") or "").strip()
 default_email = approved_email if approved_email else profile.get("email", "")
 
 with st.form("profil_form", clear_on_submit=False):
@@ -155,8 +84,7 @@ if DEBUG:
         st.write("approved_email =", repr(approved_email))
         st.write("email_raw =", repr(email_raw))
         st.write("email_normalized =", repr(email))
-        st.write("token_present =", True)
-        st.write("validated_token =", repr(st.session_state.get("validated_token", "")))
+        st.write("token_present =", bool(st.query_params.get("token")))
 
 if submitted:
     if not email:
@@ -168,6 +96,7 @@ if submitted:
         save_profile({"prenom": prenom.strip(), "nom": nom.strip(), "email": email})
         st.success("Profil enregistré. Tu peux aller sur “Mon espace” / “Mon programme”.")
 
+        # log profile_saved
         log_event_via_webhook(
             email=email,
             event="profile_saved",
