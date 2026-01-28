@@ -2,17 +2,16 @@
 import json
 import streamlit as st
 
-import streamlit as st
-st.caption("DEPLOY_FINGERPRINT=EVERINSIGHT_PROD_MAIN_2026-01-28_B")
-
-
 from components.access_guard import enforce_access
-from components.everboarding_gate import log_event_via_webhook  # si tu veux garder tes logs existants
+from components.everboarding_gate import log_event_via_webhook  # logs existants
 
 # =============================
 # STREAMLIT CONFIG (MUST BE FIRST)
 # =============================
 st.set_page_config(page_title="Bienvenue", page_icon="🏁", layout="wide")
+
+# 🔎 DEPLOY FINGERPRINT (DEBUG PROD)
+st.caption("DEPLOY_FINGERPRINT=EVERINSIGHT_PROD_MAIN_2026-01-28_C")
 
 # =============================
 # CONFIG
@@ -30,7 +29,7 @@ DEBUG = bool(st.secrets.get("DEBUG", False))
 # =============================
 access = enforce_access(portal_url=PORTAL_URL, page_name="accueil")
 approved_email = (access.get("email") or "").strip().lower()
-st.session_state["approved_email"] = approved_email  # utile pour verrouiller l'email dans le form
+st.session_state["approved_email"] = approved_email  # verrouillage email
 
 # =============================
 # HELPERS
