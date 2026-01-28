@@ -2,6 +2,10 @@
 import json
 import streamlit as st
 
+import streamlit as st
+st.caption("DEPLOY_FINGERPRINT=EVERINSIGHT_PROD_MAIN_2026-01-28_B")
+
+
 from components.access_guard import enforce_access
 from components.everboarding_gate import log_event_via_webhook  # si tu veux garder tes logs existants
 
